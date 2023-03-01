@@ -1,0 +1,5 @@
+app_identifier("<app identifer>") # The bundle identifier of your app
+apple_id(ENV["APPLE_ID"]) # Your Apple email address
+
+itc_team_id(ENV["ITUNES_TEAM_ID"]) # App Store Connect Team ID
+team_id(ENV["APPSTORE_TEAM_ID"]) # Developer Portal Team ID

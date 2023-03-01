@@ -1,0 +1,59 @@
+name: ios-deployment
+
+on:
+ push:
+    branches:
+      - 'master'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      P8_AUTH_KEY: ${{ secrets.P8_AUTH_KEY }}
+      APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      ITUNES_TEAM_ID: ${{ secrets.ITUNES_TEAM_ID }}
+      APPSTORE_TEAM_ID: ${{ secrets.APPSTORE_TEAM_ID }}
+      MATCH_REPO_SSH: ${{ secrets.MATCH_REPO_SSH }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    steps:
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '13.1.0'
+
+      - uses: actions/checkout@master
+
+      - uses: webfactory/ssh-agent@v0.5.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_REPO_KEY }}
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7.4
+      
+      - name: Install Dependencies
+        run: |
+          cd ios
+          bundle install
+
+      - uses: actions/cache@v2
+        with:
+          path: Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Setup dependencies
+        run: |
+          npm install
+          cd ios
+          pod install
+
+      - name: Build and deploy
+        run: |
+          cd ios
+          echo "${{ secrets.P8_AUTH_KEY }}" > secretKey.p8
+          bundle exec fastlane ios release

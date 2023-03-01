@@ -1,0 +1,78 @@
+######## IOS CONFIGURATIONS
+# If you want to make the build automatically available to external groups,
+# add the name of the group to the array below, after "App Store Connect Users"
+groups = ["External Tests group name"]
+workspace = "yourapp.xcworkspace"
+project = "yourapp.xcodeproj"
+slack_weebhook_url = ENV["SLACK_WEBHOOK_URL"]
+
+# If you build for multiple environments, you might wanna set this specifically on build_app
+configuration = "Release"
+scheme = "yourapp"
+export_method = "app-store" # specify the export method
+key_id = ENV["APPSTORE_KEY_ID"] # The key id of the p8 file
+issuer_id = ENV["APPSTORE_ISSUER_ID"] # issuer id on appstore connect
+key_filepath = "fastlane/secretKey.p8" # The path to p8 file generated on appstore connect
+######## END IOS CONFIGURATIONS
+
+
+
+default_platform(:ios)
+
+platform :ios do
+  desc "Push a new build to TestFlight"
+
+  lane :release do
+    setup_ci
+    app_identifier = CredentialsManager::AppfileConfig.try_fetch_value(:app_identifier)
+    api_key = app_store_connect_api_key(
+      key_id: key_id,
+      issuer_id: issuer_id,
+      key_filepath: key_filepath,
+      in_house: true
+    )
+
+    latest_build_number = latest_testflight_build_number(
+        api_key: api_key,
+        app_identifier: app_identifier
+    )
+    increment_build_number(
+        build_number: (latest_build_number + 1),
+    )
+
+
+    clear_derived_data
+    match(api_key: api_key)
+    
+    gym(
+      scheme: scheme,
+      configuration: configuration,
+      export_options: {
+        method: export_method,
+        compile_bitcode: true
+      }
+    )
+
+    pilot(
+      changelog: "Build #{latest_build_number + 1}",
+      api_key: api_key,
+      app_identifier: app_identifier,
+      distribute_external: true,
+      groups: groups,
+    )
+
+    slack(
+      slack_url: slack_weebhook_url,
+      message: "Build #{latest_build_number + 1} is available on TestFlight",
+      channel: "#your-channel",
+      default_payloads: [],
+      success: true,
+      payload: {
+        'Build Date' => Time.now,
+        'Build Number' => latest_build_number + 1
+      }
+    )
+
+    clean_build_artifacts
+  end
+end
