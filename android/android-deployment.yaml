@@ -1,0 +1,38 @@
+name: android-deployment
+
+on:
+ push:
+    branches:
+      - 'master'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    continue-on-error: false
+
+    steps:
+      - uses: actions/checkout@master
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 2.7.4
+
+      - name: Install Dependencies
+        run: |
+          cd android
+          bundle install
+
+      - name: Setup dependencies
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}' > android/google-service-account-key.json
+          echo "${{ secrets.ANDROID_SIGNING_KEY }}" > my-upload-key.keystore.asc
+          gpg -d --passphrase "${{ secrets.ANDROID_SIGNING_KEY_PASSPHRASE }}" --batch my-upload-key.keystore.asc > android/app/my-upload-key.keystore
+
+      - name: Build and deploy
+        run: |
+          npm install
+          export NODE_OPTIONS=--openssl-legacy-provider
+          cd android
+          bundle exec fastlane android internal

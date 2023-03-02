@@ -1,0 +1,51 @@
+######## Android CONFIGURATIONS
+
+package_name = "<applicationID>"
+json_key_file = "google-service-account-key.json"
+gradle_file_path = "./app/build.gradle"
+slack_weebhook_url = ENV["SLACK_WEBHOOK_URL"]
+######## END Android CONFIGURATIONS
+
+default_platform(:android)
+
+platform :android do
+
+  desc "Build and deploy to internal track"
+  lane :internal do
+
+    previous_build_number = google_play_track_version_codes(
+      package_name: package_name,
+      json_key: json_key_file,
+      track: "beta",
+    )[0]
+
+    current_build_number = previous_build_number + 1
+
+    increment_version_code(
+      gradle_file_path: gradle_file_path,
+      version_code: current_build_number
+    )
+       
+    gradle(
+      task: "clean bundleRelease",
+      gradle_path: "./gradlew"
+    )
+
+    upload_to_play_store(
+      track: "beta",
+      aab: "app/build/outputs/bundle/release/app-release.aab",
+    ) 
+
+    slack(
+      slack_url: slack_weebhook_url,
+      message: "Android : Build #{previous_build_number + 1} is available for Open Testing",
+      channel: "#whenn-app",
+      default_payloads: [],
+      success: true,
+      payload: {
+        'Build Date' => Time.now,
+        'Build Number' => previous_build_number + 1
+      }
+    )
+  end
+end
